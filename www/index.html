@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<!--
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+-->
+<html>
+    <head>
+        <title>TODO supply a title</title>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width" />
+        <link rel="stylesheet" href="res/jquery-mobile.min.css" />
+        <link rel="stylesheet" href="res/style.css" />
+
+        <script type="text/javascript" src="libs/js/jquery.min.js"></script>
+        <script type="text/javascript" src="libs/js/jquery-mobile.min.js"></script>
+        <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?sensor=true"></script>
+        <script type="text/javascript">
+            // Wait for device API libraries to load
+            //
+            document.addEventListener("deviceready", onDeviceReady, false);
+
+            // device APIs are available
+            //
+            function onDeviceReady() {
+                var db = window.openDatabase("Database", "1.0", "Cordova Demo", 200000);
+                db.transaction(populateDB, errorCB, successCB);
+            }
+
+            // Populate the database
+            //
+            function populateDB(tx) {
+                tx.executeSql('CREATE TABLE IF NOT EXISTS DEMO (id unique, data)');
+                tx.executeSql('INSERT INTO DEMO (id, data) VALUES (1, "First row")');
+                tx.executeSql('INSERT INTO DEMO (id, data) VALUES (2, "Second row")');
+            }
+
+            // Transaction error callback
+            //
+            function errorCB(tx, err) {
+                alert("Error processing SQL: " + err);
+            }
+
+            // Transaction success callback
+            //
+            function successCB() {
+                alert("success!");
+            }
+
+            function initialize() {
+                var mapOptions = {
+                    center: new google.maps.LatLng(-34.397, 150.644),
+                    disableDefaultUI: true,
+                    zoom: 8
+                };
+
+                var map = new google.maps.Map(document.getElementById("map-canvas"), mapOptions);
+            }
+
+            google.maps.event.addDomListener(window, 'load', initialize);
+        </script>
+    </head>
+    <body>
+        <div data-role="page" id="pageone">
+            <div data-role="header" data-position="fixed">
+                <h1>Welcome To My Homepage</h1>
+            </div>
+
+            <div data-role="content">
+                <div id="map-canvas"></div>
+            </div>
+        </div> 
+
+        <div data-role="page" id="pagetwo">
+            <div data-role="header">
+                <h1>I'm A Dialog Box!</h1>
+            </div>
+
+            <div data-role="content">
+                <p>The dialog box is different from a normal page, it is displayed on top of the current page with a dark background color. It will not span the entire width of the page. The dialog has an icon of "X" in the header to close the box.</p>
+                <a href="#pageone">Go to Page One</a>
+            </div>
+
+            <div data-role="footer">
+                <h1>Footer Text</h1>
+            </div>
+        </div> 
+    </body>
+</html>
