@@ -47,7 +47,7 @@ and open the template in the editor.
             // Transaction success callback
             //
             function successCB() {
-                alert("success!");
+                navigator.notification.alert("Success!", function () {}, "Uploaded Database", "OK");
             }
 
             function initialize() {
