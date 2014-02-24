@@ -14,10 +14,12 @@ and open the template in the editor.
 
         <script type="text/javascript" src="libs/js/jquery.min.js"></script>
         <script type="text/javascript" src="libs/js/jquery-mobile.min.js"></script>
+        <script type="text/javascript" src="libs/js/highcharts.js"></script>
+        <script type="text/javascript" src="libs/js/highcharts-more.js"></script>
         <script type="text/javascript" src="libs/js/projectbase.js"></script>
         <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?sensor=true"></script>
         <script type="text/javascript">
-            var LinkServer = null, db = null;
+            var LinkServer = null, db = null, map, sectores = [];
             
             $(function () {
                 //Initialize variables
@@ -29,7 +31,7 @@ and open the template in the editor.
                 
                 //Create tables to the DB
                 db.transaction(function (tx) {
-                    //tx.executeSql('DROP TABLE IF EXISTS version');
+                    tx.executeSql('DROP TABLE IF EXISTS version');
                     //tx.executeSql('DROP TABLE IF EXISTS sector');
                     //tx.executeSql('DROP TABLE IF EXISTS puntos');
                     //tx.executeSql('DROP TABLE IF EXISTS valores');
@@ -133,7 +135,7 @@ and open the template in the editor.
                         }
                         
                         if(sw) {
-                            generatePol();
+                            initialize();
                         } else {
                             setTimeout(onComplete, 150);
                         }
@@ -142,8 +144,96 @@ and open the template in the editor.
             }
             
             function generatePol () {
-                console.log("hola mundo");
-                //hola mundo
+                db.transaction(function (tx) {
+                    tx.executeSql('SELECT * FROM sector', [], function (_tx, result) {
+                        for(var i=0; i<result.rows.length; i++) {
+                            sectores[i] = {
+                                idsector: result.rows.item(i).idsector,
+                                nombre: result.rows.item(i).nombre,
+                                tipo: result.rows.item(i).tipo,
+                                puntos: []
+                            };
+                        }
+                    });
+                }, error, function () {
+                    db.transaction(function (tx) {
+                        for(var i in sectores) {
+                            (function (k) {
+                                tx.executeSql('SELECT * FROM puntos WHERE idsector = ?', [sectores[k].idsector], function (_tx, result) {
+                                    for(var j=0; j<result.rows.length; j++) {
+                                        var p = result.rows.item(j);
+                                        sectores[k].puntos.push(new google.maps.LatLng(p.y, p.x));
+                                    }
+                                });
+                            })(i);
+                        }
+                    }, error, function () {
+                        for(var i in sectores) {
+                            (function (j) {
+                                var polygon = new google.maps.Polygon({
+                                    paths: sectores[j].puntos,
+                                    strokeColor: '#FF0000',
+                                    strokeOpacity: 0.8,
+                                    strokeWeight: 1,
+                                    fillColor: '#FF0000',
+                                    fillOpacity: 0.5
+                                });
+                                
+                                google.maps.event.addListener(polygon, 'click', function (e) {
+                                    $.mobile.changePage($("#pagetwo"));
+                                    var range = [], prom = [];
+                                    db.transaction(function (tx) {
+                                        tx.executeSql('SELECT * FROM valores WHERE idsector = ?', [sectores[j].idsector], function (tx, result) {
+                                            for(var i=0; i<result.rows.length; i++) {
+                                                var v = result.rows.item(i);
+                                                range.push([parseInt(v.mes), parseFloat(v.min), parseFloat(v.max)]);
+                                                prom.push([parseInt(v.mes), parseFloat(v.prom)]);
+                                            }
+                                            
+                                            $('#grafica').highcharts({
+                                                title: {
+                                                    text: 'Costos en el tiempo'
+                                                }, xAxis: {
+                                                    type: 'datetime'
+                                                }, yAxis: {
+                                                    title: {
+                                                        text: null
+                                                    }
+                                                }, tooltip: {
+                                                    crosshairs: true,
+                                                    shared: true,
+                                                    valueSuffix: 'COP'
+                                                }, legend: {
+                                                }, series: [{
+                                                    name: 'Precio',
+                                                    data: prom,
+                                                    zIndex: 1,
+                                                    marker: {
+                                                            fillColor: 'white',
+                                                            lineWidth: 2,
+                                                            lineColor: Highcharts.getOptions().colors[0]
+                                                    }
+                                                }, {
+                                                    name: 'Range',
+                                                    data: range,
+                                                    type: 'arearange',
+                                                    lineWidth: 0,
+                                                    linkedTo: ':previous',
+                                                    color: Highcharts.getOptions().colors[0],
+                                                    fillOpacity: 0.3,
+                                                    zIndex: 0
+                                                }]
+
+                                            });
+                                        });
+                                    });
+                                });
+                                
+                                polygon.setMap(map);
+                            })(i);
+                        }
+                    });
+                });
             }
 
             // Transaction error callback
@@ -158,15 +248,16 @@ and open the template in the editor.
 
             function initialize() {
                 var mapOptions = {
-                    center: new google.maps.LatLng(-34.397, 150.644),
+                    center: new google.maps.LatLng(10.9639, -74.7964),
                     disableDefaultUI: true,
-                    zoom: 8
+                    zoom: 12
                 };
 
-                var map = new google.maps.Map(document.getElementById("map-canvas"), mapOptions);
+                map = new google.maps.Map(document.getElementById("map-canvas"), mapOptions);
+                generatePol();
             }
 
-            google.maps.event.addDomListener(window, 'load', initialize);
+            //google.maps.event.addDomListener(window, 'load', initialize);
         </script>
     </head>
     <body>
@@ -181,16 +272,16 @@ and open the template in the editor.
         </div> 
 
         <div data-role="page" id="pagetwo">
-            <div data-role="header">
-                <h1>I'm A Dialog Box!</h1>
+            <div data-role="header" data-position="fixed">
+                <h1>Grafica</h1>
             </div>
 
             <div data-role="content">
-                <p>The dialog box is different from a normal page, it is displayed on top of the current page with a dark background color. It will not span the entire width of the page. The dialog has an icon of "X" in the header to close the box.</p>
+                <div id="grafica"></div>
                 <a href="#pageone">Go to Page One</a>
             </div>
 
-            <div data-role="footer">
+            <div data-role="footer" data-position="fixed">
                 <h1>Footer Text</h1>
             </div>
         </div> 
