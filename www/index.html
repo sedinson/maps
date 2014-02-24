@@ -26,12 +26,17 @@ and open the template in the editor.
                 LinkServer = new Linker('http://192.227.159.91/pot/');
                 LinkServer.setExtension(".json?");
                 
+                //Remove transitions
+                $(document).bind('pageinit', function () {
+                    $.mobile.defaultPageTransition = 'none';
+                });
+                
                 //Create connection to the DB
                 db = window.openDatabase("pot", "1.0", "POT Database", 5 * 1024 * 1024);
                 
                 //Create tables to the DB
                 db.transaction(function (tx) {
-                    tx.executeSql('DROP TABLE IF EXISTS version');
+                    //tx.executeSql('DROP TABLE IF EXISTS version');
                     //tx.executeSql('DROP TABLE IF EXISTS sector');
                     //tx.executeSql('DROP TABLE IF EXISTS puntos');
                     //tx.executeSql('DROP TABLE IF EXISTS valores');
@@ -173,15 +178,16 @@ and open the template in the editor.
                                 var polygon = new google.maps.Polygon({
                                     paths: sectores[j].puntos,
                                     strokeColor: '#FF0000',
-                                    strokeOpacity: 0.8,
-                                    strokeWeight: 1,
+                                    strokeOpacity: 0.9,
+                                    strokeWeight: 2,
                                     fillColor: '#FF0000',
-                                    fillOpacity: 0.5
+                                    fillOpacity: 0.35
                                 });
                                 
                                 google.maps.event.addListener(polygon, 'click', function (e) {
-                                    $.mobile.changePage($("#pagetwo"));
+                                    $.mobile.changePage($("#view-graphic"));
                                     var range = [], prom = [];
+                                    $("#view-graphic").find("h1").html(sectores[j].nombre);
                                     db.transaction(function (tx) {
                                         tx.executeSql('SELECT * FROM valores WHERE idsector = ?', [sectores[j].idsector], function (tx, result) {
                                             for(var i=0; i<result.rows.length; i++) {
@@ -223,7 +229,6 @@ and open the template in the editor.
                                                     fillOpacity: 0.3,
                                                     zIndex: 0
                                                 }]
-
                                             });
                                         });
                                     });
@@ -237,53 +242,73 @@ and open the template in the editor.
             }
 
             // Transaction error callback
-            //
             function error(err) {
                 console.log(err.message);
             }
 
             // Transaction success callback
-            //
             function success() {}
 
             function initialize() {
                 var mapOptions = {
                     center: new google.maps.LatLng(10.9639, -74.7964),
                     disableDefaultUI: true,
-                    zoom: 12
+                    zoom: 14
                 };
 
                 map = new google.maps.Map(document.getElementById("map-canvas"), mapOptions);
                 generatePol();
             }
-
-            //google.maps.event.addDomListener(window, 'load', initialize);
         </script>
     </head>
     <body>
         <div data-role="page" id="pageone">
             <div data-role="header" data-position="fixed">
-                <h1>Welcome To My Homepage</h1>
+                <a href="#dialog-filter" data-rel="popup" data-position-to="window" data-iconpos="notext" data-role="button" data-icon="bars">Filtrar</a>
+                <h1>Mapas</h1>
+                <a href="#" data-iconpos="notext" data-role="button" data-icon="gear">Opciones</a>
             </div>
 
             <div data-role="content">
                 <div id="map-canvas"></div>
             </div>
+            
+            <div data-role="popup" id="dialog-filter">
+                <div data-role="header">
+                    <h1>Seleccione...</h1>
+                </div>
+                
+                <form method="post" action="demoform.asp">
+                    <div data-role="main" class="ui-content">
+                        <fieldset data-role="controlgroup">
+                            <legend>Seleccione los barrios a mostrar:</legend>
+                            <label for="red">Red</label>
+                            <input type="checkbox" name="favcolor" id="red" value="red">
+                            <label for="green">Green</label>
+                            <input type="checkbox" name="favcolor" id="green" value="green">
+                            <label for="blue">Blue</label>
+                            <input type="checkbox" name="favcolor" id="blue" value="blue">	
+                        </fieldset>
+                    </div>
+                    
+                    <div data-role="footer">
+                        <div align="right" style="margin: 0 5px;">
+                            <button data-icon="check" >Aceptar</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
         </div> 
 
-        <div data-role="page" id="pagetwo">
+        <div data-role="page" id="view-graphic">
             <div data-role="header" data-position="fixed">
+                <a href="#" data-rel="back" data-iconpos="notext" data-role="button" data-icon="arrow-l">Regresar</a>
                 <h1>Grafica</h1>
             </div>
 
             <div data-role="content">
                 <div id="grafica"></div>
-                <a href="#pageone">Go to Page One</a>
             </div>
-
-            <div data-role="footer" data-position="fixed">
-                <h1>Footer Text</h1>
-            </div>
-        </div> 
+        </div>
     </body>
 </html>
