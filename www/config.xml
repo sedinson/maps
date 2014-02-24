@@ -5,4 +5,5 @@
     <author email="info@com.coolappz" href="http://www.coolappz.com">edinson</author>
     <access origin="*"/>
     <preference name="webviewbounce" value="true"/>
+    <preference name="orientation" value="portrait" />
 </widget>
