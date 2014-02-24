@@ -14,42 +14,147 @@ and open the template in the editor.
 
         <script type="text/javascript" src="libs/js/jquery.min.js"></script>
         <script type="text/javascript" src="libs/js/jquery-mobile.min.js"></script>
+        <script type="text/javascript" src="libs/js/projectbase.js"></script>
         <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?sensor=true"></script>
         <script type="text/javascript">
+            var LinkServer = null, db = null;
+            
             $(function () {
-                navigator.notification.alert("Success!", function () {}, "Uploaded Database", "OK");
-                alert("Esta entro");
+                //Initialize variables
+                LinkServer = new Linker('http://192.227.159.91/pot/');
+                LinkServer.setExtension(".json?");
+                
+                //Create connection to the DB
+                db = window.openDatabase("pot", "1.0", "POT Database", 5 * 1024 * 1024);
+                
+                //Create tables to the DB
+                db.transaction(function (tx) {
+                    //tx.executeSql('DROP TABLE IF EXISTS version');
+                    //tx.executeSql('DROP TABLE IF EXISTS sector');
+                    //tx.executeSql('DROP TABLE IF EXISTS puntos');
+                    //tx.executeSql('DROP TABLE IF EXISTS valores');
+                    
+                    tx.executeSql('CREATE TABLE IF NOT EXISTS version (idversion unique, version)');
+                    tx.executeSql('CREATE TABLE IF NOT EXISTS sector (idsector unique, nombre, tipo)');
+                    tx.executeSql('CREATE TABLE IF NOT EXISTS puntos (idpuntos unique, idsector, x, y)');
+                    tx.executeSql('CREATE TABLE IF NOT EXISTS valores (idvalores unique, idsector, mes, min, max, prom)');
+                    
+                    //Find for a new version of data
+                    tx.executeSql('INSERT OR IGNORE INTO version (idversion, version) VALUES (?, ?)', [1, 0]);
+                    tx.executeSql('SELECT version FROM version', [], updateVersion);
+                }, error, success);
             });
-            // Wait for device API libraries to load
-            //
-            document.addEventListener("deviceready", onDeviceReady, false);
-
-            // device APIs are available
-            //
-            function onDeviceReady() {
-                var db = window.openDatabase("Database", "1.0", "Cordova Demo", 200000);
-                db.transaction(populateDB, errorCB, successCB);
+            
+            function updateVersion (_tx, result) {
+                //Get the last version on the application
+                var version = (result.rows.length > 0)? result.rows.item(0).version : 0;
+                
+                //Find on the server for a new version
+                uget({
+                    url: LinkServer.Url('version', 'ref')
+                }).done(function (data) {
+                    //If a new version was found, update!
+                    var updated = [false, false, false];
+                    
+                    if(data._response.version > version) {
+                        console.log("A new version was Found! Updating...");
+                        
+                        //Delete old information and update the version ID
+                        db.transaction(function (tx) {
+                            tx.executeSql('UPDATE version SET version = ? WHERE idversion = 1', [data._response.version]);
+                            tx.executeSql('DELETE FROM valores WHERE idvalores > 0');
+                            tx.executeSql('DELETE FROM puntos WHERE idpuntos > 0');
+                            tx.executeSql('DELETE FROM sector WHERE idsector > 0');
+                        });
+                        
+                        //Get the new sector
+                        uget({
+                            url: LinkServer.Url('sector', 'get')
+                        }).done(function (data) {
+                            db.transaction(function (tx) {
+                                for(var i in data._response) {
+                                    var ob = data._response[i];
+                                    tx.executeSql(
+                                        'INSERT INTO sector (idsector, nombre, tipo) VALUES (?, ?, ?)',
+                                        [ob.idsector, ob.nombre, ob.tipo]
+                                    );
+                                }
+                            }, error, function () {
+                                updated[0] = true;
+                            });
+                            
+                        });
+                        
+                        //Get the new puntos
+                        uget({
+                            url: LinkServer.Url('puntos', 'get')
+                        }).done(function (data) {
+                            db.transaction(function (tx) {
+                                for(var i in data._response) {
+                                    var ob = data._response[i];
+                                    tx.executeSql(
+                                        'INSERT INTO puntos (idpuntos, idsector, x, y) VALUES (?, ?, ?, ?)',
+                                        [ob.idpuntos, ob.idsector, ob.x, ob.y]
+                                    );
+                                }
+                            }, error, function () {
+                                updated[1] = true;
+                            });
+                            
+                        });
+                        
+                        //Get the new valores
+                        uget({
+                            url: LinkServer.Url('valores', 'get')
+                        }).done(function (data) {
+                            db.transaction(function (tx) {
+                                for(var i in data._response) {
+                                    var ob = data._response[i];
+                                    tx.executeSql(
+                                        'INSERT INTO valores (idvalores, idsector, mes, max, min, prom) VALUES (?, ?, ?, ?, ?, ?)',
+                                        [ob.idvalores, ob.idsector, ob.mes, ob.max, ob.min, ob.prom]
+                                    );
+                                }
+                            }, error, function () {
+                                updated[2] = true;
+                            });
+                            
+                        });
+                    } else {
+                        for(var i=0; i<updated.length; i++) {
+                            updated[i] = true;
+                        }
+                    }
+                    
+                    (function onComplete () {
+                        var sw = true;
+                        for(var i=0; i<updated.length && sw; i++) {
+                            sw = updated[i];
+                        }
+                        
+                        if(sw) {
+                            generatePol();
+                        } else {
+                            setTimeout(onComplete, 150);
+                        }
+                    })();
+                });
             }
-
-            // Populate the database
-            //
-            function populateDB(tx) {
-                tx.executeSql('CREATE TABLE IF NOT EXISTS DEMO (id unique, data)');
-                tx.executeSql('INSERT INTO DEMO (id, data) VALUES (1, "First row")');
-                tx.executeSql('INSERT INTO DEMO (id, data) VALUES (2, "Second row")');
+            
+            function generatePol () {
+                console.log("hola mundo");
+                //hola mundo
             }
 
             // Transaction error callback
             //
-            function errorCB(tx, err) {
-                alert("Error processing SQL: " + err);
+            function error(err) {
+                console.log(err.message);
             }
 
             // Transaction success callback
             //
-            function successCB() {
-                navigator.notification.alert("Success!", function () {}, "Uploaded Database", "OK");
-            }
+            function success() {}
 
             function initialize() {
                 var mapOptions = {
